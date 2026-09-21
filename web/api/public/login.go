@@ -2,11 +2,13 @@ package public
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
 	"github.com/komari-monitor/komari/database/accounts"
 	"github.com/komari-monitor/komari/database/auditlog"
+	"github.com/komari-monitor/komari/pkg/aswired"
 	"github.com/komari-monitor/komari/pkg/config"
 	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/web/api"
@@ -23,18 +25,26 @@ type LoginRequest struct {
 const sessionCookieMaxAge = 2592000
 
 func setSessionCookie(c *gin.Context, value string, maxAge int) {
+	secure := utils.GetScheme(c) == "https"
+	if aswired.Enabled() {
+		secure = aswired.Secure()
+	}
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "session_token",
 		Value:    value,
 		Path:     "/",
 		MaxAge:   maxAge,
-		Secure:   utils.GetScheme(c) == "https",
+		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
 func Login(c *gin.Context) {
+	if aswired.Enabled() {
+		c.JSON(403, gin.H{"status": "error", "message": "请使用统一登录页面", "loginUrl": aswired.LoginURL()})
+		return
+	}
 	DisablePasswordLogin, _ := config.GetAs[bool](config.DisablePasswordLoginKey, false)
 	if DisablePasswordLogin {
 		api.RespondError(c, http.StatusForbidden, "Password login is disabled")
@@ -86,8 +96,17 @@ func Login(c *gin.Context) {
 }
 func Logout(c *gin.Context) {
 	session, _ := c.Cookie("session_token")
-	accounts.DeleteSession(session)
+	if session != "" {
+		if err := accounts.DeleteSession(session); aswired.Enabled() && err != nil && !errors.Is(err, aswired.ErrInvalidSession) {
+			api.RespondError(c, http.StatusServiceUnavailable, "无法撤销登录会话，请稍后重试退出")
+			return
+		}
+	}
 	setSessionCookie(c, "", -1)
 	auditlog.Log(c.ClientIP(), "", "logged out", "logout")
+	if aswired.Enabled() {
+		c.Redirect(302, aswired.LoginURL())
+		return
+	}
 	c.Redirect(302, "/")
 }

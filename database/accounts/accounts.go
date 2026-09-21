@@ -9,6 +9,7 @@ import (
 
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
+	"github.com/komari-monitor/komari/pkg/aswired"
 	"github.com/komari-monitor/komari/utils"
 
 	"github.com/google/uuid"
@@ -20,6 +21,9 @@ const constantSalt = "06Wm4Jv1Hkxx"
 //
 // 如果密码正确，返回用户的 UUID 和 true；否则返回空字符串和 false
 func CheckPassword(username, passwd string) (uuid string, success bool) {
+	if aswired.Enabled() {
+		return "", false
+	}
 	db := dbcore.GetDBInstance()
 	var user models.User
 	result := db.Where("username = ?", username).First(&user)
@@ -35,6 +39,9 @@ func CheckPassword(username, passwd string) (uuid string, success bool) {
 
 // ForceResetPassword 强制重置用户密码
 func ForceResetPassword(username, passwd string) (err error) {
+	if aswired.Enabled() {
+		return aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	result := db.Model(&models.User{}).Where("username = ?", username).Update("passwd", hashPasswd(passwd))
 	if result.Error != nil {
@@ -56,6 +63,9 @@ func hashPasswd(passwd string) string {
 }
 
 func CreateAccount(username, passwd string) (user models.User, err error) {
+	if aswired.Enabled() {
+		return user, aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	hashedPassword := hashPasswd(passwd)
 	user = models.User{
@@ -71,6 +81,9 @@ func CreateAccount(username, passwd string) (user models.User, err error) {
 }
 
 func DeleteAccountByUsername(username string) (err error) {
+	if aswired.Enabled() {
+		return aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	err = db.Where("username = ?", username).Delete(&models.User{}).Error
 	if err != nil {
@@ -81,6 +94,9 @@ func DeleteAccountByUsername(username string) (err error) {
 
 // 创建默认管理员账户，使用环境变量 ADMIN_USERNAME 作为用户名，环境变量 ADMIN_PASSWORD 作为密码
 func CreateDefaultAdminAccount() (username, passwd string, err error) {
+	if aswired.Enabled() {
+		return "", "", aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 
 	username = os.Getenv("ADMIN_USERNAME")
@@ -136,6 +152,9 @@ func GetUserBySSO(ssoID string) (user models.User, err error) {
 }
 
 func BindingExternalAccount(uuid string, sso_id string) error {
+	if aswired.Enabled() {
+		return aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	err := db.Model(&models.User{}).Where("uuid = ?", uuid).Update("sso_id", sso_id).Error
 	if err != nil {
@@ -145,6 +164,9 @@ func BindingExternalAccount(uuid string, sso_id string) error {
 }
 
 func UnbindExternalAccount(uuid string) error {
+	if aswired.Enabled() {
+		return aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	err := db.Model(&models.User{}).Where("uuid = ?", uuid).Update("sso_id", "").Error
 	if err != nil {
@@ -154,6 +176,9 @@ func UnbindExternalAccount(uuid string) error {
 }
 
 func UpdateUser(uuid string, name, password, sso_type *string) error {
+	if aswired.Enabled() {
+		return aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	// Check if user exists
 	var existingUser models.User

@@ -8,6 +8,7 @@ import (
 	"github.com/komari-monitor/komari/database/accounts"
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
+	"github.com/komari-monitor/komari/pkg/aswired"
 	"github.com/komari-monitor/komari/protocol/v1"
 	agent_runtime "github.com/komari-monitor/komari/web/agent"
 )
@@ -65,6 +66,7 @@ func GetClients(c *gin.Context) {
 			return
 		}
 		message := string(data)
+		if aswired.Enabled() && isLogin { if _,err:=aswired.Session(session);err!=nil{return} }
 
 		uuID := ""
 		if message != "get" { // 非请求全部内容

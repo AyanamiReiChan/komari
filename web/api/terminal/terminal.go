@@ -12,6 +12,7 @@ type TerminalSession struct {
 	Browser     *websocket.Conn
 	Agent       *websocket.Conn
 	RequesterIp string
+	IdentitySession string
 }
 
 var TerminalSessionsMutex = &sync.Mutex{}

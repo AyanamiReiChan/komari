@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"image"
+	"github.com/komari-monitor/komari/pkg/aswired"
 
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
@@ -13,6 +14,9 @@ var (
 )
 
 func Generate2Fa() (string, image.Image, error) {
+	if aswired.Enabled() {
+		return "", nil, aswired.ErrManaged
+	}
 	otp, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      TwoFactorIssuer,
 		AccountName: "komari",
@@ -28,11 +32,17 @@ func Generate2Fa() (string, image.Image, error) {
 }
 
 func Enable2Fa(uuid, secret string) error {
+	if aswired.Enabled() {
+		return aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	return db.Model(&models.User{}).Where("uuid = ?", uuid).Update("two_factor", secret).Error
 }
 
 func Verify2Fa(uuid, code string) (bool, error) {
+	if aswired.Enabled() {
+		return false, aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	var user models.User
 	err := db.Where("uuid = ?", uuid).First(&user).Error
@@ -53,6 +63,9 @@ func Verify2Fa(uuid, code string) (bool, error) {
 }
 
 func Disable2Fa(uuid string) error {
+	if aswired.Enabled() {
+		return aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	return db.Model(&models.User{}).Where("uuid = ?", uuid).Update("two_factor", "").Error
 }

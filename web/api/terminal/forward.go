@@ -1,10 +1,12 @@
 package terminal
 
 import (
+	"errors"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/komari-monitor/komari/database/auditlog"
+	"github.com/komari-monitor/komari/pkg/aswired"
 )
 
 func ForwardTerminal(id string) {
@@ -15,7 +17,36 @@ func ForwardTerminal(id string) {
 	}
 	auditlog.Log(session.RequesterIp, session.UserUUID, "established, terminal id:"+id, "terminal")
 	established_time := time.Now()
-	errChan := make(chan error, 1)
+	errChan := make(chan error, 3)
+	done := make(chan struct{})
+	defer close(done)
+	checkIdentity := func() error {
+		if session.IdentitySession == "" {
+			return nil
+		}
+		identity, err := aswired.Session(session.IdentitySession)
+		if err != nil || identity.ID != session.UserUUID {
+			return errors.New("terminal login expired")
+		}
+		return nil
+	}
+	if session.IdentitySession != "" {
+		go func() {
+			ticker := time.NewTicker(15 * time.Second)
+			defer ticker.Stop()
+			for {
+				if err := checkIdentity(); err != nil {
+					errChan <- err
+					return
+				}
+				select {
+				case <-done:
+					return
+				case <-ticker.C:
+				}
+			}
+		}()
+	}
 
 	go func() {
 		for {
@@ -25,8 +56,12 @@ func ForwardTerminal(id string) {
 				return
 			}
 
+			if err := checkIdentity(); err != nil {
+				errChan <- err
+				return
+			}
 			if messageType == websocket.TextMessage {
-				if session.Agent != nil && string(data[0:1]) == "{" {
+				if session.Agent != nil && len(data) > 0 && data[0] == '{' {
 					err = session.Agent.WriteMessage(websocket.TextMessage, data)
 				} else if session.Agent != nil {
 					err = session.Agent.WriteMessage(websocket.BinaryMessage, data)

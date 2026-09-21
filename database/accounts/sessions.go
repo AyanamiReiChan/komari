@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/models"
 	messageevent "github.com/komari-monitor/komari/database/models/messageEvent"
+	"github.com/komari-monitor/komari/pkg/aswired"
 	"github.com/komari-monitor/komari/pkg/config"
 	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/geoip"
@@ -17,6 +19,9 @@ import (
 
 // GetAllSessions 获取所有会话
 func GetAllSessions() (sessions []models.Session, err error) {
+	if aswired.Enabled() {
+		return nil, aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	err = db.Find(&sessions).Error
 	if err != nil {
@@ -27,6 +32,9 @@ func GetAllSessions() (sessions []models.Session, err error) {
 
 // CreateSession 创建新会话
 func CreateSession(uuid string, expires int, userAgent, ip, login_method string) (string, error) {
+	if aswired.Enabled() {
+		return "", aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	session := utils.GenerateRandomString(32)
 
@@ -66,6 +74,10 @@ func CreateSession(uuid string, expires int, userAgent, ip, login_method string)
 
 // GetSession 根据会话 ID 获取 UUID
 func GetSession(session string) (uuid string, err error) {
+	if aswired.Enabled() {
+		identity, e := aswired.Session(session)
+		return identity.ID, e
+	}
 	db := dbcore.GetDBInstance()
 	var sessionRecord models.Session
 	err = db.Where("session = ?", session).First(&sessionRecord).Error
@@ -83,6 +95,17 @@ func GetSession(session string) (uuid string, err error) {
 }
 
 func GetUserBySession(session string) (models.User, error) {
+	if aswired.Enabled() {
+		identity, e := aswired.Session(session)
+		if e != nil {
+			return models.User{}, e
+		}
+		u := models.User{UUID: identity.ID, Username: identity.Username}
+		if identity.TwoFactor {
+			u.TwoFactor = "central"
+		}
+		return u, nil
+	}
 	db := dbcore.GetDBInstance()
 	var sessionRecord models.Session
 	err := db.Where("session = ?", session).First(&sessionRecord).Error
@@ -94,6 +117,10 @@ func GetUserBySession(session string) (models.User, error) {
 
 // DeleteSession 删除指定会话
 func DeleteSession(session string) (err error) {
+	if aswired.Enabled() {
+		_, err := aswired.Call(context.Background(), "introspect", map[string]any{"session": session, "logout": true})
+		return err
+	}
 	db := dbcore.GetDBInstance()
 	result := db.Where("session = ?", session).Delete(&models.Session{})
 	if result.Error != nil {
@@ -103,6 +130,9 @@ func DeleteSession(session string) (err error) {
 }
 
 func DeleteAllSessions() error {
+	if aswired.Enabled() {
+		return aswired.ErrManaged
+	}
 	db := dbcore.GetDBInstance()
 	result := db.Where("1 = 1").Delete(&models.Session{})
 	if result.Error != nil {
@@ -126,6 +156,9 @@ func UpdateLatestIp(session, ip string) error {
 }
 
 func UpdateLatest(session, useragent, ip string) error {
+	if aswired.Enabled() {
+		return nil
+	}
 	db := dbcore.GetDBInstance()
 	return db.Model(&models.Session{}).Where("session = ?", session).Updates(map[string]interface{}{
 		"latest_online":     time.Now(),

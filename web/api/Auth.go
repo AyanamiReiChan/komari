@@ -84,6 +84,7 @@ func GetRole(c *gin.Context) string {
 // --- 私有站点访问控制 ---
 
 var publicPaths = []string{
+	"/api/aswired/auth",
 	"/ping",
 	"/api/public",
 	"/api/login",

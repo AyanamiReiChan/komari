@@ -23,6 +23,7 @@ import (
 	d_notification "github.com/komari-monitor/komari/database/notification"
 	"github.com/komari-monitor/komari/database/records"
 	"github.com/komari-monitor/komari/database/tasks"
+	"github.com/komari-monitor/komari/pkg/aswired"
 	"github.com/komari-monitor/komari/pkg/config"
 	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/utils/cloudflared"
@@ -55,6 +56,9 @@ func init() {
 }
 
 func RunServer() {
+	if err := aswired.Validate(); err != nil {
+		log.Fatal(err)
+	}
 	// #region 初始化
 	if err := os.MkdirAll("./data/theme", os.ModePerm); err != nil {
 		log.Fatalf("Failed to create theme directory: %v", err)
@@ -172,6 +176,10 @@ func RunServer() {
 }
 
 func InitDatabase() {
+	if aswired.Enabled() {
+		dbcore.GetDBInstance()
+		return
+	}
 	var count int64 = 0
 	if dbcore.GetDBInstance().Model(&models.User{}).Count(&count); count == 0 {
 		user, passwd, err := accounts.CreateDefaultAdminAccount()

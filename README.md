@@ -1,3 +1,30 @@
+# Komari for ASWired
+
+这是用于 ASWired 的 **Komari 1.2.5-fix2** 修改版，发行版本 `1.2.5-fix2-aswired.1.0.0`。保留上游版权、MIT 许可证和 Git 历史。
+
+- 统一账户由 ASWired 管理；整合模式不生成默认 Komari 管理员。
+- 从 ASWired 首次初始化页创建主控管理员，再在用户管理中创建 Komari 类型账户。
+- 修改版网站与 Go 主程序一起编译，前端源码位于 `frontend/`。
+- 部署、更新、校验值和完整教程见 [ASWired-Release](https://github.com/AyanamiReiChan/ASWired-Release)。**整合部署不要用上游安装脚本或镜像覆盖**，否则会丢失统一登录改动。
+
+```sh
+cd frontend
+npm ci
+npm run build
+cd ..
+mkdir -p web/public/defaultTheme
+cp -R frontend/dist web/public/defaultTheme/
+cp frontend/komari-theme.json web/public/defaultTheme/
+CGO_ENABLED=1 go test ./...
+CGO_ENABLED=1 go build -trimpath -ldflags '-s -w -X github.com/komari-monitor/komari/utils.CurrentVersion=1.2.5-fix2-aswired.1.0.0' -o komari .
+```
+
+Linux 构建需要 C 编译器和与 `go.mod` 相容的 Go。独立监控 Agent 沿用上游 Komari Agent；ASWired Agent 负责代理管理，两者职责不同。
+
+---
+
+以下是上游项目说明，独立部署命令不用于 ASWired 整合版。
+
 # Komari
 
 ![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Fkomari-monitor%2Fkomari&label=&icon=github&color=%23a370f7&message=&style=flat&tz=UTC)

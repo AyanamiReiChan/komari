@@ -31,6 +31,8 @@ func Register(r *gin.Engine) {
 
 // registerPublicRoutes 公开路由。JSON 读接口经 Bind 绑定到 public: 命名空间方法。
 func registerPublicRoutes(r *gin.Engine) {
+	r.GET("/api/aswired/auth", public_api.ASWiredOptions)
+	r.POST("/auth/aswired/session", public_api.ASWiredSession)
 	// 非 JSON / 特殊流程，保留 REST handler。
 	r.POST("/api/login", public_api.Login)
 	r.GET("/api/logout", public_api.Logout)
@@ -155,7 +157,6 @@ func registerAdminRoutes(r *gin.Engine) {
 		databaseGroup.GET("/size", jsonRpc.Bind("admin:getDatabaseSize"))
 		databaseGroup.POST("/vacuum", jsonRpc.Bind("admin:vacuumDatabase", jsonRpc.WithMessage("database vacuumed")))
 	}
-
 
 	// clients
 	clientGroup := g.Group("/client")

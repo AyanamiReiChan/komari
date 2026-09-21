@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/database/accounts"
+	"github.com/komari-monitor/komari/pkg/aswired"
 	"github.com/komari-monitor/komari/pkg/config"
 	"github.com/komari-monitor/komari/pkg/rpc"
 	"github.com/komari-monitor/komari/web/api"
@@ -49,6 +50,18 @@ func CallFromGin(c *gin.Context, method string, params any) *rpc.JsonRpcResponse
 //
 // 若请求已被 RequireSensitive2FA 中间件校验过(sensitive_2fa_verified),则跳过,避免重复校验。
 func dispatchWithSensitive(ctx context.Context, c *gin.Context, meta *rpc.ContextMeta, req *rpc.JsonRpcRequest) *rpc.JsonRpcResponse {
+	if aswired.Enabled() && meta != nil && meta.Principal != nil && meta.Principal.Type == rpc.PrincipalUser {
+		code := extractRequestTwoFACode(req)
+		if code == "" && c != nil {
+			code = headerOrQueryTwoFACode(c)
+		}
+		sensitive := rpc.IsSensitive(req.Method) && (c == nil || !c.GetBool("sensitive_2fa_verified"))
+		identity, err := aswired.Call(ctx, "introspect", map[string]any{"session": meta.SessionToken, "sensitive": sensitive, "code": code})
+		if err != nil || identity.ID != meta.Principal.UserUUID {
+			return rpc.ErrorResponse(req.ID, rpc.PermissionDenied, "统一会话已失效或身份验证失败", nil)
+		}
+		return Dispatch(ctx, meta, req)
+	}
 	if meta != nil && meta.Principal != nil && (c == nil || !c.GetBool("sensitive_2fa_verified")) &&
 		rpc.IsSensitive(req.Method) && rpc.CheckPrincipal(meta.Principal, req.Method) {
 		code := extractRequestTwoFACode(req)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/database/clients"
+	"github.com/komari-monitor/komari/pkg/aswired"
 	"github.com/komari-monitor/komari/utils"
 	agent_runtime "github.com/komari-monitor/komari/web/agent"
 	"github.com/komari-monitor/komari/web/api"
@@ -40,6 +41,15 @@ func RequestTerminal(c *gin.Context) {
 		Browser:     conn,
 		Agent:       nil,
 		RequesterIp: c.ClientIP(),
+	}
+	if aswired.Enabled() {
+		if _, isAPIKey := c.Get("api_key"); !isAPIKey {
+			session.IdentitySession, _ = c.Cookie("session_token")
+			if session.IdentitySession == "" {
+				conn.Close()
+				return
+			}
+		}
 	}
 
 	TerminalSessionsMutex.Lock()

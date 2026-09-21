@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/database/accounts"
 	"github.com/komari-monitor/komari/database/auditlog"
+	"github.com/komari-monitor/komari/pkg/aswired"
 	"github.com/komari-monitor/komari/pkg/config"
 	"github.com/komari-monitor/komari/utils"
 	"github.com/komari-monitor/komari/web/oauth"
@@ -14,6 +15,10 @@ import (
 
 // /api/oauth
 func OAuth(c *gin.Context) {
+	if aswired.Enabled() {
+		c.Redirect(302, aswired.LoginURL())
+		return
+	}
 	OAuthEnabled, _ := config.GetAs[bool](config.OAuthEnabledKey, false)
 	if !OAuthEnabled {
 		c.JSON(403, gin.H{"status": "error", "error": "OAuth is not enabled"})
@@ -29,6 +34,10 @@ func OAuth(c *gin.Context) {
 
 // /api/oauth_callback
 func OAuthCallback(c *gin.Context) {
+	if aswired.Enabled() {
+		c.AbortWithStatus(403)
+		return
+	}
 
 	// 验证state防止CSRF攻击
 	state, _ := c.Cookie("oauth_state")

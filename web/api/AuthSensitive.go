@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/komari-monitor/komari/database/accounts"
+	"github.com/komari-monitor/komari/pkg/aswired"
 )
 
 func RequireSensitive2FA() gin.HandlerFunc {
@@ -56,6 +57,11 @@ func VerifySensitive2FACore(userUUID, code string, isAPIKey bool) error {
 // VerifySensitive2FA gin 适配层:从 gin.Context 提取参数后委托核心校验。
 func VerifySensitive2FA(c *gin.Context) error {
 	_, isAPIKey := c.Get("api_key")
+	if aswired.Enabled() && !isAPIKey {
+		session, _ := c.Cookie("session_token")
+		_, err := aswired.Call(c.Request.Context(), "introspect", map[string]any{"session": session, "sensitive": true, "code": get2FACode(c)})
+		return err
+	}
 	uuidRaw, _ := c.Get("uuid")
 	uuid, _ := uuidRaw.(string)
 	return VerifySensitive2FACore(uuid, get2FACode(c), isAPIKey)
